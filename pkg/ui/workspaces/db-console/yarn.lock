@@ -1355,16 +1355,15 @@
     minimist "^1.2.0"
 
 "@cockroachlabs/cluster-ui@link:../cluster-ui":
-  version "0.0.0"
-  uid ""
+  version "22.2.0-prerelease-5"
+  dependencies:
+    "@babel/runtime" "^7.12.13"
 
 "@cockroachlabs/crdb-protobuf-client-ccl@link:./ccl/src/js":
-  version "0.0.0"
-  uid ""
+  version "0.0.12"
 
 "@cockroachlabs/crdb-protobuf-client@link:./src/js":
-  version "0.0.0"
-  uid ""
+  version "0.0.12"
 
 "@cockroachlabs/design-tokens@0.4.5":
   version "0.4.5"
@@ -1380,8 +1379,7 @@
     eslint-config-prettier "^6.11.0"
 
 "@cockroachlabs/eslint-plugin-crdb@link:../eslint-plugin-crdb":
-  version "0.0.0"
-  uid ""
+  version "1.0.0"
 
 "@cockroachlabs/icons@0.5.2":
   version "0.5.2"
@@ -11105,15 +11103,10 @@ minimist@1.2.0:
   resolved "https://registry.yarnpkg.com/minimist/-/minimist-1.2.0.tgz#a35008b20f41383eec1fb914f4cd5df79a264284"
   integrity sha1-o1AIsg9BOD7sH7kU9M1d95omQoQ=
 
-minimist@^1.1.1:
+minimist@^1.1.1, minimist@^1.2.0, minimist@^1.2.5, minimist@^1.2.6:
   version "1.2.6"
   resolved "https://registry.yarnpkg.com/minimist/-/minimist-1.2.6.tgz#8637a5b759ea0d6e98702cfb3a9283323c93af44"
   integrity sha512-Jsjnk4bw3YJqYzbdyBiNsPWHPfO++UGG749Cxs6peCu5Xg4nrena6OVxOYxrQTqww0Jmwt+Ref8rggumkTLz9Q==
-
-minimist@^1.2.0, minimist@^1.2.5:
-  version "1.2.5"
-  resolved "https://registry.yarnpkg.com/minimist/-/minimist-1.2.5.tgz#67d66014b66a6a8aaa0c083c5fd58df4e4e97602"
-  integrity sha512-FM9nNUYrRBAELZQT3xeZQ7fmMOBg6nWNmJKTcgsJeaLstP/UODVpGsr5OhXhhXg6f+qtJ8uiZ+PUxkDWcgIXLw==
 
 minipass-collect@^1.0.2:
   version "1.0.2"
