@@ -34,7 +34,6 @@ import (
 	"github.com/cockroachdb/cockroach/pkg/sql/sem/catconstants"
 	"github.com/cockroachdb/cockroach/pkg/storage"
 	"github.com/cockroachdb/cockroach/pkg/storage/disk"
-	"github.com/cockroachdb/cockroach/pkg/storage/enginepb"
 	"github.com/cockroachdb/cockroach/pkg/storage/fs"
 	"github.com/cockroachdb/cockroach/pkg/ts"
 	"github.com/cockroachdb/cockroach/pkg/util"
@@ -195,10 +194,6 @@ type BaseConfig struct {
 	// Locality is a description of the topography of the server.
 	Locality roachpb.Locality
 
-	// StorageEngine specifies the engine type (eg. rocksdb, pebble) to use to
-	// instantiate stores.
-	StorageEngine enginepb.EngineType
-
 	// TestingKnobs is used for internal test controls only.
 	TestingKnobs base.TestingKnobs
 
@@ -319,7 +314,6 @@ func (cfg *BaseConfig) SetDefaults(
 	cfg.MaxOffset = MaxOffsetType(base.DefaultMaxClockOffset)
 	cfg.DisableMaxOffsetCheck = false
 	cfg.DefaultZoneConfig = zonepb.DefaultZoneConfig()
-	cfg.StorageEngine = storage.DefaultStorageEngine
 	cfg.WALFailover = base.WALFailoverConfig{Mode: base.WALFailoverDefault}
 	cfg.TestingInsecureWebAccess = disableWebLogin
 	cfg.Stores = base.StoreSpecList{
@@ -648,6 +642,10 @@ func makeStorageCfg(
 
 // String implements the fmt.Stringer interface.
 func (cfg *Config) String() string {
+	return redact.StringWithoutMarkers(cfg)
+}
+
+func (cfg *Config) SafeFormat(sp redact.SafePrinter, _ rune) {
 	var buf bytes.Buffer
 
 	w := tabwriter.NewWriter(&buf, 2, 1, 2, ' ', 0)
@@ -663,7 +661,7 @@ func (cfg *Config) String() string {
 	}
 	_ = w.Flush()
 
-	return buf.String()
+	sp.Print(redact.SafeString(buf.String()))
 }
 
 // Report logs an overview of the server configuration parameters via
@@ -674,7 +672,7 @@ func (cfg *Config) Report(ctx context.Context) {
 	} else {
 		log.Infof(ctx, "system total memory: %s", humanizeutil.IBytes(memSize))
 	}
-	log.Infof(ctx, "server configuration:\n%s", log.SafeManaged(cfg))
+	log.Infof(ctx, "server configuration:\n%s", cfg)
 }
 
 // Engines is a container of engines, allowing convenient closing.

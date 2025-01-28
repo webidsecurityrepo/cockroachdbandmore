@@ -35,9 +35,6 @@ var (
 
 var timestampSize = int64(unsafe.Sizeof(time.Time{}))
 
-var _ sqlstats.Writer = &Container{}
-
-// RecordStatement implements sqlstats.Writer interface.
 // RecordStatement saves per-statement statistics.
 //
 // samplePlanDescription can be nil, as these are only sampled periodically
@@ -127,17 +124,11 @@ func (s *Container) RecordStatement(
 	stats.mu.data.IndexRecommendations = value.IndexRecommendations
 	stats.mu.data.Indexes = util.CombineUnique(stats.mu.data.Indexes, value.Indexes)
 
-	// Percentile latencies are only being sampled if the latency was above the
-	// AnomalyDetectionLatencyThreshold.
-	latencies := s.anomalies.GetPercentileValues(stmtFingerprintID)
 	latencyInfo := appstatspb.LatencyInfo{
 		Min: value.ServiceLatencySec,
 		Max: value.ServiceLatencySec,
-		P50: latencies.P50,
-		P90: latencies.P90,
-		P99: latencies.P99,
 	}
-	stats.mu.data.LatencyInfo.Add(latencyInfo)
+	stats.mu.data.LatencyInfo.MergeMaxMin(latencyInfo)
 
 	// Note that some fields derived from tracing statements (such as
 	// BytesSentOverNetwork) are not updated here because they are collected
@@ -176,7 +167,6 @@ func (s *Container) RecordStatement(
 	return stats.ID, nil
 }
 
-// RecordStatementExecStats implements sqlstats.Writer interface.
 func (s *Container) RecordStatementExecStats(
 	key appstatspb.StatementStatisticsKey, stats execstats.QueryLevelStats,
 ) error {
@@ -206,8 +196,7 @@ func (s *Container) ShouldSample(fingerprint string, implicitTxn bool, database 
 	return previouslySampled
 }
 
-// RecordTransaction implements sqlstats.Writer interface and saves
-// per-transaction statistics.
+// RecordTransaction saves per-transaction statistics.
 func (s *Container) RecordTransaction(
 	ctx context.Context, key appstatspb.TransactionFingerprintID, value sqlstats.RecordedTxnStats,
 ) error {

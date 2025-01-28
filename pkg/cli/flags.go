@@ -27,6 +27,7 @@ import (
 	"github.com/cockroachdb/cockroach/pkg/security"
 	"github.com/cockroachdb/cockroach/pkg/security/username"
 	"github.com/cockroachdb/cockroach/pkg/server/telemetry"
+	"github.com/cockroachdb/cockroach/pkg/storage/storagepb"
 	"github.com/cockroachdb/cockroach/pkg/util/envutil"
 	"github.com/cockroachdb/cockroach/pkg/util/log/logflags"
 	"github.com/cockroachdb/cockroach/pkg/util/netutil/addr"
@@ -61,6 +62,7 @@ var storeSpecs base.StoreSpecList
 var goMemLimit int64
 var tenantIDFile string
 var localityFile string
+var encryptionSpecs storagepb.EncryptionSpecList
 
 // initPreFlagsDefaults initializes the values of the global variables
 // defined above.
@@ -292,6 +294,10 @@ func (f *keyTypeFilter) Set(v string) error {
 
 const backgroundEnvVar = "COCKROACH_BACKGROUND_RESTART"
 
+// This value is never read. It is used to hold the storage engine which is now
+// a hidden option.
+var deprecatedStorageEngine string
+
 func init() {
 	initCLIDefaults()
 
@@ -314,7 +320,7 @@ func init() {
 
 	// Add store flag handling for the pebble debug command as it needs store
 	// flags configured.
-	AddPersistentPreRunE(DebugPebbleCmd, func(cmd *cobra.Command, _ []string) error {
+	AddPersistentPreRunE(debugPebbleCmd, func(cmd *cobra.Command, _ []string) error {
 		return extraStoreFlagInit(cmd)
 	})
 
@@ -420,6 +426,13 @@ func init() {
 		// attributes too? Would this be useful for e.g. SQL query
 		// planning?
 		cliflagcfg.StringFlag(f, &serverCfg.Attrs, cliflags.Attrs)
+
+		cliflagcfg.VarFlag(cmd.Flags(), &encryptionSpecs, cliflags.EnterpriseEncryption)
+
+		// Add a new pre-run command to match encryption specs to store specs.
+		AddPersistentPreRunE(cmd, func(cmd *cobra.Command, _ []string) error {
+			return populateStoreSpecsEncryption()
+		})
 	}
 
 	// Flags common to the start commands, the connect command, and the node join
@@ -507,7 +520,11 @@ func init() {
 		cliflagcfg.StringFlag(f, &localityFile, cliflags.LocalityFile)
 
 		cliflagcfg.VarFlag(f, &storeSpecs, cliflags.Store)
-		cliflagcfg.VarFlag(f, &serverCfg.StorageEngine, cliflags.StorageEngine)
+
+		// deprecatedStorageEngine is only kept for backwards compatibility.
+		cliflagcfg.StringFlag(f, &deprecatedStorageEngine, cliflags.StorageEngine)
+		_ = pf.MarkHidden(cliflags.StorageEngine.Name)
+
 		cliflagcfg.VarFlag(f, &serverCfg.WALFailover, cliflags.WALFailover)
 		cliflagcfg.StringFlag(f, &serverCfg.SharedStorage, cliflags.SharedStorage)
 		cliflagcfg.VarFlag(f, &serverCfg.SecondaryCache, cliflags.SecondaryCache)
@@ -977,7 +994,7 @@ func init() {
 	}
 	{
 		// TODO(ayang): clean up so dir isn't passed to both pebble and --store
-		f := DebugPebbleCmd.PersistentFlags()
+		f := debugPebbleCmd.PersistentFlags()
 		cliflagcfg.VarFlag(f, &storeSpecs, cliflags.Store)
 	}
 	{
@@ -1476,6 +1493,17 @@ func mtStartSQLFlagsInit(cmd *cobra.Command) error {
 		}
 	}
 	return nil
+}
+
+// populateStoreSpecsEncryption is a PreRun hook that matches store encryption
+// specs with the parsed stores and populates some fields in the StoreSpec and
+// WAL failover config.
+func populateStoreSpecsEncryption() error {
+	return base.PopulateWithEncryptionOpts(
+		GetServerCfgStores(),
+		GetWALFailoverConfig(),
+		encryptionSpecs,
+	)
 }
 
 // RegisterFlags exists so that other packages can register flags using the

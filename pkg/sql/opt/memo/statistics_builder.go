@@ -18,6 +18,7 @@ import (
 	"github.com/cockroachdb/cockroach/pkg/sql/opt/constraint"
 	"github.com/cockroachdb/cockroach/pkg/sql/opt/props"
 	"github.com/cockroachdb/cockroach/pkg/sql/sem/eval"
+	"github.com/cockroachdb/cockroach/pkg/sql/sem/idxtype"
 	"github.com/cockroachdb/cockroach/pkg/sql/sem/tree"
 	"github.com/cockroachdb/cockroach/pkg/sql/stats"
 	"github.com/cockroachdb/cockroach/pkg/sql/types"
@@ -635,7 +636,7 @@ func (sb *statisticsBuilder) makeTableStatistics(tabID opt.TableID) *props.Stati
 	invertedIndexCols := make(map[int]invertedIndexColInfo)
 	for indexI, indexN := 0, tab.IndexCount(); indexI < indexN; indexI++ {
 		index := tab.Index(indexI)
-		if !index.IsInverted() {
+		if index.Type() != idxtype.INVERTED {
 			continue
 		}
 		col := index.InvertedColumn()
@@ -1947,8 +1948,8 @@ func (sb *statisticsBuilder) buildZigzagJoin(
 	// join ends up having a higher row count and therefore higher cost than
 	// a competing index join + constrained scan.
 	tab := sb.md.Table(zigzag.LeftTable)
-	leftIndexInverted := tab.Index(zigzag.LeftIndex).IsInverted()
-	rightIndexInverted := tab.Index(zigzag.RightIndex).IsInverted()
+	leftIndexInverted := tab.Index(zigzag.LeftIndex).Type() == idxtype.INVERTED
+	rightIndexInverted := tab.Index(zigzag.RightIndex).Type() == idxtype.INVERTED
 	if leftIndexInverted {
 		unapplied.unknown += len(zigzag.LeftFixedCols) * 2
 	}
@@ -5254,9 +5255,16 @@ func (sb *statisticsBuilder) factorOutVirtualCols(
 		}
 		expr, ok := tab.ComputedCols[colID]
 		if !ok {
-			panic(errors.AssertionFailedf(
-				"could not find computed column expression for column %v in table %v", colID, tab.Alias,
-			))
+			// If we can't find the computed column expression, this is probably a
+			// mutation column. Whatever the reason, it's safe to skip: we simply
+			// won't factor out matching expressions.
+			if buildutil.CrdbTestBuild &&
+				!tab.Table.Column(tab.MetaID.ColumnOrdinal(colID)).IsMutation() {
+				panic(errors.AssertionFailedf(
+					"could not find computed column expression for column %v in table %v", colID, tab.Alias,
+				))
+			}
+			return
 		}
 		virtExprs = append(virtExprs, virtExpr{colID: colID, expr: expr})
 	})
